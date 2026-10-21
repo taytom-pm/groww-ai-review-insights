@@ -1,0 +1,861 @@
+{
+  "name": "Groww App Reviews - AI Product Insights",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fe89f682-7f47-4224-9dd9-6b521a732f07",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1Pz6iDn9P8ReK0SQ8HqYwzOPfGaVdYpQ-",
+          "mode": "list",
+          "cachedResultName": "groww_reviews_12_weeks.csv",
+          "cachedResultUrl": "https://drive.google.com/file/d/1Pz6iDn9P8ReK0SQ8HqYwzOPfGaVdYpQ-/view?usp=drivesdk"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        224,
+        0
+      ],
+      "id": "624fa4d3-f0c9-44b4-b64c-953af938cac6",
+      "name": "Download Groww Reviews CSV",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "Dy2K5JlqRdN8XUnK",
+          "name": "Google Drive account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        0
+      ],
+      "id": "7677e10e-8ddf-42d7-8638-5d8d1bf82065",
+      "name": "Extract Customer Reviews"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6be72820-68b2-4905-a2bf-1820000a3338",
+              "name": "review_id",
+              "value": "={{ $json.review_id }}",
+              "type": "string"
+            },
+            {
+              "id": "4a0ef232-ae7a-4a17-8db0-6192f32829d1",
+              "name": "review_text",
+              "value": "={{ $json.review_text }}",
+              "type": "string"
+            },
+            {
+              "id": "3f9084b7-33c0-4ff0-b66d-48296e28d993",
+              "name": "rating",
+              "value": "={{ $json.rating }}",
+              "type": "number"
+            },
+            {
+              "id": "539d69b6-4c41-4587-a51d-13023dcea8ad",
+              "name": "review_date",
+              "value": "={{ $json.date }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        672,
+        0
+      ],
+      "id": "3f816f43-db75-4fe1-9a66-1c522c2d1dcb",
+      "name": "Standardise Review Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\n\nconst reviews = items\n  .map((item, index) => ({\n    review_id: item.json.review_id || `row_${index + 1}`,\n    review_text: String(item.json.review_text ?? \"\").trim(),\n    rating: item.json.rating ?? null,\n    review_date: item.json.review_date ?? null\n  }))\n  .filter(review => review.review_text.length > 0);\n\nconst analysisInput = {\n  product: \"Groww\",\n  total_reviews: reviews.length,\n  analysis_focus: [\n    \"Customer sentiment\",\n    \"Recurring product issues\",\n    \"App performance and usability\",\n    \"Trading and investing experience\",\n    \"Brokerage fees and other charges\",\n    \"Frequently misunderstood fees or charges\",\n    \"Suggested product improvements\"\n  ],\n  reviews: reviews\n};\n\nreturn [\n  {\n    json: {\n      ...analysisInput,\n      reviews_json: JSON.stringify(analysisInput)\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "27fc8c04-1a3b-48d3-ad84-9c40af511ea5",
+      "name": "Prepare Review Dataset"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst input = $input.first().json;\nconst reviews = input.reviews;\n\nconst batchSize = 50;\nconst batches = [];\n\nfor (let i = 0; i < reviews.length; i += batchSize) {\n  const batch = reviews.slice(i, i + batchSize);\n\n  batches.push({\n    json: {\n      product: \"Groww\",\n      batch_number: Math.floor(i / batchSize) + 1,\n      total_batches: Math.ceil(reviews.length / batchSize),\n      review_count: batch.length,\n      reviews_json: JSON.stringify({\n        product: \"Groww\",\n        reviews: batch\n      })\n    }\n  });\n}\n\nreturn batches;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "057a5332-5079-40d5-81dc-c626f5fcda4f",
+      "name": "Create 50-Review Batches"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst batches = $input.all();\n\nreturn batches.slice(0, 1);\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "46f974e8-384e-43bf-b360-a9095d5d1095",
+      "name": "TEST - Limit to One Branch"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "\nYou are a product feedback analyst for Groww, an Indian investment and trading app.\n\nYour task is to classify EVERY customer review provided in the input.\n\nReturn ONLY valid JSON. Do not include markdown, explanations, or code fences.\n\nUse this exact output structure:\n\n{\n  \"product\": \"Groww\",\n  \"reviews\": [\n    {\n      \"review_id\": \"original review ID\",\n      \"sentiment\": \"positive\",\n      \"themes\": [\"usability\"],\n      \"fee_confusion\": false\n    }\n  ]\n}\n\nCLASSIFICATION RULES\n\n1. REVIEW COVERAGE\n- Classify every review exactly once.\n- Preserve each original review_id.\n- Do not invent or omit reviews.\n\n2. SENTIMENT\nChoose exactly one:\n- positive\n- negative\n- mixed_or_neutral\n\nUse mixed_or_neutral when feedback contains substantial positive and negative elements, or has no clear sentiment.\n\n3. THEMES\nSelect one or more from:\n- brokerage_fees\n- other_charges\n- fee_explanation_confusion\n- app_performance\n- usability\n- trading_experience\n- account_access\n- customer_support\n- other\n\nAssign themes based on explicit evidence in the review.\n\n4. FEE CONFUSION — STRICT RULES\n\nSet fee_confusion = true ONLY when the review explicitly indicates:\n- The user does not understand a fee or charge.\n- The user is unsure why a fee was deducted.\n- The user cannot interpret a fee breakdown or ledger.\n- The user does not know what brokerage fees apply.\n- The user requests clarification about how a fee is calculated.\n- The user reports that fee information is unclear or insufficient to understand investment costs.\n\nSet fee_confusion = false when:\n- The user only complains that fees are expensive.\n- The user compares brokerage prices with competitors without expressing confusion.\n- The user discusses usability, trading, or app performance without mentioning fee uncertainty.\n- The user reports an accidental trade or missing confirmation prompt.\n- The user mentions brokerage generally without indicating uncertainty.\n- The review does not contain explicit evidence of fee confusion.\n\n5. FEE THEMES\n\nUse brokerage_fees when the review discusses brokerage pricing or trading commissions.\n\nUse other_charges when the review discusses GST, statutory charges, mutual fund expense ratios, or other investment costs.\n\nUse fee_explanation_confusion ONLY when the review explicitly expresses uncertainty, difficulty understanding charges, or insufficient fee transparency.\n\nA review may contain both brokerage_fees and fee_explanation_confusion.\n\n6. IMPORTANT EXAMPLES\n\nExample A:\n\"Brokerage is too expensive.\"\nsentiment: negative\nthemes: [\"brokerage_fees\"]\nfee_confusion: false\n\nExample B:\n\"I cannot understand the brokerage deductions in my ledger.\"\nsentiment: negative\nthemes: [\"brokerage_fees\", \"fee_explanation_confusion\"]\nfee_confusion: true\n\nExample C:\n\"The app placed my sell order without confirmation.\"\nsentiment: negative\nthemes: [\"trading_experience\", \"usability\"]\nfee_confusion: false\n\nExample D:\n\"I don't know the brokerage charges but the UI is excellent.\"\nsentiment: positive\nthemes: [\"brokerage_fees\", \"usability\", \"fee_explanation_confusion\"]\nfee_confusion: true\n\nExample E:\n\"Please show the complete mutual fund expense ratio and applicable charges so investors can compare costs.\"\nsentiment: negative\nthemes: [\"other_charges\", \"fee_explanation_confusion\"]\nfee_confusion: true\n\n7. FINAL CHECK\n\nBefore responding:\n- Verify every original review ID is included exactly once.\n- Ensure every sentiment and theme is valid.\n- Ensure fee_confusion is a JSON boolean, not a string.\n- Ensure fee_confusion is true only when supported by the review text.\n- Do not assume a fee is misunderstood merely because it is mentioned.\n- Return JSON only.\n"
+            },
+            {
+              "content": "=\nAnalyse the following Groww customer reviews:\n\n{{ $json.reviews_json }}\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1568,
+        0
+      ],
+      "id": "52a5d346-7740-4bf3-b2bf-71e82fa55dc8",
+      "name": "AI - Classify Review Sentiment & Issues",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\n\n// Get the original batch of 50 reviews\nconst originalBatch = $(\"TEST - Limit to One Branch\").first().json;\n\nconst originalReviews = JSON.parse(\n  originalBatch.reviews_json\n).reviews;\n\n// Allowed classification values\nconst allowedSentiments = [\n  \"positive\",\n  \"negative\",\n  \"mixed_or_neutral\"\n];\n\nconst allowedThemes = [\n  \"brokerage_fees\",\n  \"other_charges\",\n  \"fee_explanation_confusion\",\n  \"app_performance\",\n  \"usability\",\n  \"trading_experience\",\n  \"account_access\",\n  \"customer_support\",\n  \"other\"\n];\n\n// Get original review IDs\nconst originalIds = originalReviews.map(\n  r => String(r.review_id)\n);\n\nconst originalIdSet = new Set(originalIds);\nconst allClassifications = [];\n\n// Read and parse OpenAI responses\nfor (const item of items) {\n  const rawText = item.json.output?.[0]?.content\n    ?.filter(part => part.type === \"output_text\")\n    .map(part => part.text)\n    .join(\"\");\n\n  if (!rawText) {\n    throw new Error(\"OpenAI returned no text\");\n  }\n\n  const cleaned = rawText\n    .replace(/^\\s*```(?:json)?\\s*/i, \"\")\n    .replace(/\\s*```\\s*$/, \"\")\n    .trim();\n\n  let analysis;\n\n  try {\n    analysis = JSON.parse(cleaned);\n  } catch (error) {\n    throw new Error(\n      \"Invalid AI JSON: \" + error.message\n    );\n  }\n\n  if (!Array.isArray(analysis.reviews)) {\n    throw new Error(\"AI response has no reviews array\");\n  }\n\n  allClassifications.push(...analysis.reviews);\n}\n\n// Check review IDs\nconst returnedIds = allClassifications.map(\n  r => String(r.review_id)\n);\n\nconst returnedIdSet = new Set(returnedIds);\n\nconst missingIds = originalIds.filter(\n  id => !returnedIdSet.has(id)\n);\n\nconst unexpectedIds = returnedIds.filter(\n  id => !originalIdSet.has(id)\n);\n\n// Check classification values\nconst invalidReviews = allClassifications.filter(r =>\n  !allowedSentiments.includes(r.sentiment) ||\n  !Array.isArray(r.themes) ||\n  r.themes.some(t => !allowedThemes.includes(t)) ||\n  typeof r.fee_confusion !== \"boolean\"\n);\n\n// Calculate sentiment totals\nconst sentiment = {\n  positive: 0,\n  negative: 0,\n  mixed_or_neutral: 0\n};\n\nfor (const review of allClassifications) {\n  if (allowedSentiments.includes(review.sentiment)) {\n    sentiment[review.sentiment]++;\n  }\n}\n\n// Count reviews flagged for fee confusion\nconst feeConfusionCount = allClassifications.filter(\n  r => r.fee_confusion === true\n).length;\n\n// Create a lookup of original review texts\nconst originalReviewMap = new Map(\n  originalReviews.map(r => [\n    String(r.review_id),\n    r.review_text\n  ])\n);\n\n// Create fee confusion audit\nconst feeConfusionAudit = allClassifications\n  .filter(r => r.fee_confusion === true)\n  .map(r => ({\n    review_id: r.review_id,\n    original_review: originalReviewMap.get(\n      String(r.review_id)\n    ) ?? \"Review not found\",\n    sentiment: r.sentiment,\n    themes: r.themes,\n    fee_confusion: r.fee_confusion\n  }));\n\n// Check whether structural validation passed\nconst validationPassed =\n  allClassifications.length === originalReviews.length &&\n  returnedIdSet.size === originalIdSet.size &&\n  missingIds.length === 0 &&\n  unexpectedIds.length === 0 &&\n  invalidReviews.length === 0;\n\n// Return validated analysis and audit\nreturn [{\n  json: {\n    product: \"Groww\",\n    batch_number: originalBatch.batch_number,\n    expected_review_count: originalReviews.length,\n    classifications_returned: allClassifications.length,\n    unique_review_ids: returnedIdSet.size,\n    missing_review_ids: missingIds,\n    unexpected_review_ids: unexpectedIds,\n    invalid_classifications: invalidReviews.length,\n    validation_passed: validationPassed,\n    sentiment_summary: sentiment,\n    fee_confusion_count: feeConfusionCount,\n    fee_confusion_audit: feeConfusionAudit,\n    reviews: allClassifications\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        0
+      ],
+      "id": "bc84e740-fae6-4f2e-9e4a-1880c4edaf44",
+      "name": "Code - Validate Al Classifications"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst data = $input.first().json;\n\nif (data.validation_passed !== true) {\n  throw new Error(\"Cannot aggregate invalid classifications\");\n}\n\nconst reviews = data.reviews;\n\nconst sentimentCounts = {\n  positive: 0,\n  negative: 0,\n  mixed_or_neutral: 0\n};\n\nconst themeCounts = {};\n\nfor (const review of reviews) {\n  sentimentCounts[review.sentiment]++;\n\n  for (const theme of new Set(review.themes)) {\n    themeCounts[theme] = (themeCounts[theme] || 0) + 1;\n  }\n}\n\nconst topThemes = Object.entries(themeCounts)\n  .map(([theme, count]) => ({\n    theme,\n    count\n  }))\n  .sort((a, b) => b.count - a.count);\n\nconst feeConfusionReviews = reviews.filter(\n  r => r.fee_confusion === true\n);\n\nreturn [{\n  json: {\n    product: \"Groww\",\n    analysis_scope: \"First 50 reviews - test batch\",\n    reviews_analyzed: reviews.length,\n    sentiment_summary: sentimentCounts,\n    theme_summary: topThemes,\n    fee_confusion_count: feeConfusionReviews.length,\n    fee_confusion_review_ids: feeConfusionReviews.map(\n      r => r.review_id\n    ),\n    validation_passed: true\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2384,
+        0
+      ],
+      "id": "5e2bee66-41f2-4561-ae0c-4262b9ff4bbf",
+      "name": "Code - Aggregate Product Insights"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "\nYou are a senior Product Manager at Groww, an Indian investment and trading app.\n\nCreate a concise, actionable Weekly Product Pulse for the internal product and customer support teams.\n\nUse only the provided review analysis data. Do not invent metrics, customer quotes, root causes, or fee policies.\n\nStructure the update with these headings:\n\n1. Executive Summary\n2. Customer Sentiment\n3. Top Product Themes\n4. Fee and Charge Confusion\n5. Recommended Product Actions\n6. Support Team Follow-ups\n7. Data Limitations\n\nRequirements:\n- Include exact review counts.\n- Rank product themes by frequency.\n- Clearly distinguish fee confusion from dissatisfaction with high fees.\n- Prioritize up to three actionable product recommendations.\n- Label this as a test-batch analysis, not a full weekly report.\n- Do not claim findings represent all Groww customers.\n- Do not claim a specific fee is frequently misunderstood unless the data supports it.\n- Do not invent customer quotations.\n- Write in clear, professional Markdown.\n"
+            },
+            {
+              "content": "=\nCreate a Weekly Product Pulse from this Groww review analysis:\n\n{{ JSON.stringify($json) }}\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        2608,
+        0
+      ],
+      "id": "c574cd41-7fee-41a5-b6e8-69197ba648ec",
+      "name": "AI - Generate Weekly Product Pulse",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst item = $input.first().json;\n\n// Handle both possible OpenAI output structures\nconst content = item.output?.[0]?.content ?? item.content ?? [];\n\nconst rawReport = content\n  .filter(part => part.type === \"output_text\")\n  .map(part => part.text)\n  .join(\"\\n\");\n\nif (!rawReport) {\n  throw new Error(\"Weekly Product Pulse text not found\");\n}\n\n// Remove an unsupported claim about fee dissatisfaction\nconst report = rawReport.replace(\n  /- \\*\\*Dissatisfaction with high fees\\*\\*:.*(?:\\r?\\n|$)/g,\n  \"\"\n).trim();\n\nreturn [{\n  json: {\n    product: \"Groww\",\n    report_type: \"Weekly Product Pulse\",\n    analysis_scope: \"First 50 reviews - test batch\",\n    report_markdown: report,\n    status: \"Draft - awaiting approval\"\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2976,
+        0
+      ],
+      "id": "536a276c-c8f3-48dd-bc20-fff83d775117",
+      "name": "Code - Format Weekly Product Pulse"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst data = $input.first().json;\n\nif (data.validation_passed !== true) {\n  throw new Error(\"Review classifications have not passed validation\");\n}\n\nconst feeReviews = data.fee_confusion_audit || [];\n\nreturn [{\n  json: {\n    product: \"Groww\",\n    analysis_scope: \"First 50 reviews - test batch\",\n    reviews_analyzed: data.expected_review_count,\n    fee_confusion_count: feeReviews.length,\n    fee_confusion_evidence: feeReviews,\n    status: \"Evidence prepared - fee policy verification required\"\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2384,
+        208
+      ],
+      "id": "3ce7bbd3-d27b-4a79-8acb-f8d56d40066c",
+      "name": "Code - Prepare Free Confusion"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "\nYou are a customer support communication specialist for Groww, an Indian investment and trading app.\n\nYour task is to draft a clear, empathetic customer-facing explanation based on customer feedback about fees and charges.\n\nUse only the supplied review evidence.\n\nIMPORTANT SAFETY AND ACCURACY RULES:\n- Do not invent brokerage rates, GST percentages, statutory fees, mutual fund expense ratios, or other pricing details.\n- Do not claim that any customer allegation about fees is factually correct.\n- Do not imply that Groww has approved or implemented any product changes.\n- Distinguish brokerage charges, mutual fund expense ratios, and other charges.\n- Do not assume all fees are charged directly by Groww.\n- Do not invent official Groww policies or links.\n- If exact fee details are unavailable, explain what information customers should check without supplying unverified figures.\n- Do not include customer names, review IDs, or internal analysis statistics in the customer-facing message.\n- Do not promise refunds, fee changes, or resolutions.\n\nProduce these sections:\n\n1. Customer Email Subject\n2. Customer-Facing Explanation\n3. Suggested Next Steps for Customers\n4. Internal Verification Checklist\n\nWrite in simple, professional English suitable for Indian retail investors.\n\nThe customer-facing sections must be ready for review but must not be presented as officially approved.\n\nClearly label the output as DRAFT - REQUIRES HUMAN APPROVAL.\n"
+            },
+            {
+              "content": "=\nPrepare a customer-facing fee explanation based on these Groww customer reviews:\n\n{{ JSON.stringify($json.fee_confusion_evidence) }}\n\nNumber of flagged reviews: {{ $json.fee_confusion_count }}\n\nThis is a test batch. Do not claim these concerns are representative of all Groww customers.\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        2608,
+        288
+      ],
+      "id": "7ebfedeb-e105-4a9a-a871-33d9d0cf7377",
+      "name": "AI - Generate Customer Fee Explanation",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst item = $input.first().json;\n\nconst content =\n  item.output?.[0]?.content ??\n  item.content ??\n  [];\n\nconst rawDraft = content\n  .filter(part => part.type === \"output_text\")\n  .map(part => part.text)\n  .join(\"\\n\");\n\nif (!rawDraft.trim()) {\n  throw new Error(\"Customer explanation text not found\");\n}\n\nconst draft = rawDraft.trim();\n\nreturn [{\n  json: {\n    product: \"Groww\",\n    document_type: \"Customer Fee Explanation\",\n    analysis_scope: \"First 50 reviews - test batch\",\n    email_draft_markdown: draft,\n    approval_status: \"PENDING_REVIEW\",\n    approved: false,\n    ready_to_send: false,\n    verification_required: [\n      \"Verify brokerage charge descriptions\",\n      \"Verify mutual fund TER and GST treatment\",\n      \"Verify applicable statutory charges\",\n      \"Remove unverified product improvement claims\",\n      \"Confirm customer support instructions\",\n      \"Review tone for proactive customer communication\"\n    ]\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2976,
+        288
+      ],
+      "id": "a88352ed-7d71-45cd-aa93-7a10cd9be450",
+      "name": "Code - Format Customer Fee Explanation"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3392,
+        112
+      ],
+      "id": "5bc1f5d6-d2cf-421c-b4fb-4ced8e3be5c9",
+      "name": "Merge - Combine Drafts",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "incomingAuthentication": "headerAuth",
+        "httpMethod": "POST",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4016,
+        64
+      ],
+      "id": "d875caab-9599-4c74-b8e5-ada80c03f301",
+      "name": "Wait - Human Approval",
+      "webhookId": "7be05123-722a-42a9-a8c9-f366583c4328",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "UAVOjs7XhhPuZMn4",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bb67f4cb-50a7-47f7-afae-dec223bee71b",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": "approved",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4816,
+        -48
+      ],
+      "id": "e796b6c5-d808-4ea6-b0d6-987c723d558d",
+      "name": "If - Approval Decision"
+    },
+    {
+      "parameters": {
+        "sendTo": "bamtomori@gmail.com",
+        "subject": "Groww - Weekly Product Pulse & Fee Explanation - Approval Required",
+        "emailType": "text",
+        "message": "=\n{{ \n\"INTERNAL REVIEW ONLY — DO NOT FORWARD\\n\\n\" +\n\"Please review both draft documents below.\\n\\n\" +\n\"DOCUMENT 1: WEEKLY PRODUCT PULSE\\n\\n\" +\n$(\"Code - Format Weekly Product Pulse\").first().json.report_markdown +\n\"\\n\\n-------------------------\\n\\n\" +\n\"DOCUMENT 2: CUSTOMER FEE EXPLANATION\\n\\n\" +\n$(\"Code - Format Customer Fee Explanation\").first().json.email_draft_markdown +\n\"\\n\\n-------------------------\\n\\n\" +\n\"IMPORTANT: These drafts use only the first 50 reviews and the fee explanation requires factual verification. Do not approve for customer distribution yet.\"\n}}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3760,
+        256
+      ],
+      "id": "3c7d5538-ffd3-4d99-ad44-312544dda2a7",
+      "name": "Gmail - Request Human Approval",
+      "webhookId": "3bd617bc-340e-4c79-af8f-6741da48fb9f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "6abAjh1r2P3N0gTl",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "formTitle": "Groww - Weekly Product Review Approval",
+        "formDescription": "Review the Weekly Product Pulse and Customer Fee Explanation before submitting your decision. This is a test using 50 customer reviews. Fee-related claims must be verified before approval.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "approved"
+                  },
+                  {
+                    "option": "rejected"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        3728,
+        -528
+      ],
+      "id": "4ebda159-ff60-45f5-bcbc-9fb5b32f0dec",
+      "name": "Form - Submit Approval Decision",
+      "webhookId": "338a825d-a3ee-491c-883f-ee06702e1192"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "bamtomori@gmail.com",
+        "subject": "Groww - Weekly Product Review - Approval Required",
+        "message": "=\n{{\n\"INTERNAL REVIEW ONLY - TEST BATCH\\n\\n\" +\n\"Please review both documents.\\n\\n\" +\n\n\"WEEKLY PRODUCT PULSE:\\n\\n\" +\n$json.report_markdown +\n\n\"\\n\\n------------------------\\n\\n\" +\n\n\"CUSTOMER FEE EXPLANATION:\\n\\n\" +\n$json.email_draft_markdown +\n\n\"\\n\\n------------------------\\n\\n\" +\n\n\"IMPORTANT: This is a 50-review test.\\n\" +\n\"Fee-related claims require verification.\\n\" +\n\"Choose Disapprove if corrections are needed.\"\n}}\n",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        4528,
+        -432
+      ],
+      "id": "e3798436-59f6-4bbf-9c9e-f078f47ee4d8",
+      "name": "Gmail - Human Approval",
+      "webhookId": "f1fa917e-0a3b-475a-84bf-bd18145b1bcf",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "6abAjh1r2P3N0gTl",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "Groww - Understanding Fees and Charges",
+        "message": "=\n{{ $(\"Merge - Combine Drafts\").first().json.email_draft_markdown }}\n",
+        "options": {
+          "sendTo": "bamtomori@gmail.com"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        5104,
+        160
+      ],
+      "id": "20da5deb-a4b3-4727-838e-eea196481c45",
+      "name": "Gmail - Create Customer draft",
+      "webhookId": "2f28ba1b-55f3-4f7e-9ad9-79a1be3374bf",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "6abAjh1r2P3N0gTl",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "endpointUrl": "https://prodcapital.app.n8n.cloud/mcp/3b4e61e6-ba4e-4bd3-adee-d007c2f71c4e",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.4,
+      "position": [
+        4944,
+        -368
+      ],
+      "id": "9b0547a1-abf8-46e5-894f-8a98b707dcdf",
+      "name": "MCP Client",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "UAVOjs7XhhPuZMn4",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=\n{{\n\"Use the connected MCP tool to append exactly ONE row to the Google Sheet 'Groww Weekly Product Pulse Log'.\\n\\n\" +\n\"Fill the columns as follows:\\n\" +\n\"Product: Groww\\n\" +\n\"Report_Title: Weekly Product Pulse\\n\" +\n\"Review_Count: 50\\n\" +\n\"Status: Approved\\n\" +\n\"Report_Content:\\n\" +\n$(\"Merge - Combine Drafts\").first().json.report_markdown +\n\"\\n\\nIMPORTANT INSTRUCTIONS:\\n\" +\n\"1. Use the MCP tool to write the row.\\n\" +\n\"2. Preserve the complete report text.\\n\" +\n\"3. Do not create duplicate rows.\\n\" +\n\"4. Do not send any emails.\\n\" +\n\"5. Only confirm success if the MCP tool confirms the row was created.\\n\" +\n\"6. If the MCP tool fails, report the error clearly.\"\n}}\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        5168,
+        -368
+      ],
+      "id": "b232ecaa-c9cd-4936-871a-cd87b5d46806",
+      "name": "AI Agent -MCP Product Log"
+    },
+    {
+      "parameters": {
+        "endpointUrl": "https://prodcapital.app.n8n.cloud/mcp/3b4e61e6-ba4e-4bd3-adee-d007c2f71c4e",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.4,
+      "position": [
+        5584,
+        -96
+      ],
+      "id": "934e58dd-4ddd-4a09-b3fe-c4881f513a86",
+      "name": "MCP Client1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "UAVOjs7XhhPuZMn4",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        5344,
+        -80
+      ],
+      "id": "2196f01c-71bd-44d6-b59a-9a37a8f80795",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Merge - Combine Drafts": [
+      {
+        "json": {
+          "report_markdown": "PASTE REPORT 1 HERE",
+          "email_draft_markdown": "PASTE REPORT 2 HERE"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Download Groww Reviews CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Groww Reviews CSV": {
+      "main": [
+        [
+          {
+            "node": "Extract Customer Reviews",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Customer Reviews": {
+      "main": [
+        [
+          {
+            "node": "Standardise Review Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Standardise Review Fields": {
+      "main": [
+        [
+          {
+            "node": "Prepare Review Dataset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Review Dataset": {
+      "main": [
+        [
+          {
+            "node": "Create 50-Review Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create 50-Review Batches": {
+      "main": [
+        [
+          {
+            "node": "TEST - Limit to One Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEST - Limit to One Branch": {
+      "main": [
+        [
+          {
+            "node": "AI - Classify Review Sentiment & Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Classify Review Sentiment & Issues": {
+      "main": [
+        [
+          {
+            "node": "Code - Validate Al Classifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Validate Al Classifications": {
+      "main": [
+        [
+          {
+            "node": "Code - Aggregate Product Insights",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code - Prepare Free Confusion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Aggregate Product Insights": {
+      "main": [
+        [
+          {
+            "node": "AI - Generate Weekly Product Pulse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Generate Weekly Product Pulse": {
+      "main": [
+        [
+          {
+            "node": "Code - Format Weekly Product Pulse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Prepare Free Confusion": {
+      "main": [
+        [
+          {
+            "node": "AI - Generate Customer Fee Explanation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Generate Customer Fee Explanation": {
+      "main": [
+        [
+          {
+            "node": "Code - Format Customer Fee Explanation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Format Customer Fee Explanation": {
+      "main": [
+        [
+          {
+            "node": "Merge - Combine Drafts",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code - Format Weekly Product Pulse": {
+      "main": [
+        [
+          {
+            "node": "Merge - Combine Drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge - Combine Drafts": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Human Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait - Human Approval": {
+      "main": [
+        []
+      ]
+    },
+    "Gmail - Request Human Approval": {
+      "main": [
+        [
+          {
+            "node": "Wait - Human Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Human Approval": {
+      "main": [
+        [
+          {
+            "node": "If - Approval Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If - Approval Decision": {
+      "main": [
+        [
+          {
+            "node": "AI Agent -MCP Product Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP Client1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent -MCP Product Log",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent -MCP Product Log",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent -MCP Product Log": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Create Customer draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a445e039-95e6-47e9-a183-dab3a6a3a690",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "aec9bc10a42926b87d23d56bb04edb9ea91d963df1162f3efd821e68164bcf6e"
+  },
+  "nodeGroups": [],
+  "id": "1pozKlUcU7XgtWuO",
+  "tags": []
+}
